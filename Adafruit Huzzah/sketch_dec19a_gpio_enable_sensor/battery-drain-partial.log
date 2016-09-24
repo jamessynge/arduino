@@ -1,0 +1,36 @@
+DEBUG    2015-12-20 03:17:44,052 main.py:39] Entering main; app id: jsdabbler-hrd    server type: Development
+DEBUG    2015-12-20 03:17:44,055 main.py:41] Leaving main
+INFO     2015-12-19 22:17:44,089 module.py:794] default: "GET /.record-data?temperature=21.64&humidity=31.12&compensated=31.62&vcc=3.38 HTTP/1.1" 404 52
+DEBUG    2015-12-20 04:13:29,187 main.py:39] Entering main; app id: jsdabbler-hrd    server type: Development
+DEBUG    2015-12-20 04:13:29,190 main.py:41] Leaving main
+INFO     2015-12-19 23:13:29,207 module.py:794] default: "GET /.record-data?temperature=20.70&humidity=43.11&compensated=43.75&vcc=3.38 HTTP/1.1" 404 52
+DEBUG    2015-12-20 05:10:15,048 main.py:39] Entering main; app id: jsdabbler-hrd    server type: Development
+DEBUG    2015-12-20 05:10:15,052 main.py:41] Leaving main
+INFO     2015-12-20 00:10:15,081 module.py:794] default: "GET /.record-data?temperature=20.09&humidity=43.68&compensated=44.42&vcc=3.38 HTTP/1.1" 404 52
+DEBUG    2015-12-20 06:07:08,665 main.py:39] Entering main; app id: jsdabbler-hrd    server type: Development
+DEBUG    2015-12-20 06:07:08,668 main.py:41] Leaving main
+INFO     2015-12-20 01:07:08,688 module.py:794] default: "GET /.record-data?temperature=19.43&humidity=43.93&compensated=44.77&vcc=3.38 HTTP/1.1" 404 52
+DEBUG    2015-12-20 07:04:07,792 main.py:39] Entering main; app id: jsdabbler-hrd    server type: Development
+DEBUG    2015-12-20 07:04:07,796 main.py:41] Leaving main
+INFO     2015-12-20 02:04:07,819 module.py:794] default: "GET /.record-data?temperature=19.00&humidity=44.01&compensated=44.91&vcc=3.38 HTTP/1.1" 404 52
+DEBUG    2015-12-20 08:00:58,703 main.py:39] Entering main; app id: jsdabbler-hrd    server type: Development
+DEBUG    2015-12-20 08:00:58,704 main.py:41] Leaving main
+INFO     2015-12-20 03:00:58,713 module.py:794] default: "GET /.record-data?temperature=18.57&humidity=43.98&compensated=44.94&vcc=3.38 HTTP/1.1" 404 52
+DEBUG    2015-12-20 08:57:55,841 main.py:39] Entering main; app id: jsdabbler-hrd    server type: Development
+DEBUG    2015-12-20 08:57:55,842 main.py:41] Leaving main
+INFO     2015-12-20 03:57:55,862 module.py:794] default: "GET /.record-data?temperature=18.04&humidity=43.94&compensated=44.98&vcc=3.38 HTTP/1.1" 404 52
+DEBUG    2015-12-20 09:54:56,947 main.py:39] Entering main; app id: jsdabbler-hrd    server type: Development
+DEBUG    2015-12-20 09:54:56,947 main.py:41] Leaving main
+INFO     2015-12-20 04:54:56,959 module.py:794] default: "GET /.record-data?temperature=17.69&humidity=43.85&compensated=44.95&vcc=3.38 HTTP/1.1" 404 52
+DEBUG    2015-12-20 10:52:00,710 main.py:39] Entering main; app id: jsdabbler-hrd    server type: Development
+DEBUG    2015-12-20 10:52:00,713 main.py:41] Leaving main
+INFO     2015-12-20 05:52:00,724 module.py:794] default: "GET /.record-data?temperature=18.69&humidity=43.70&compensated=44.65&vcc=3.38 HTTP/1.1" 404 52
+DEBUG    2015-12-20 11:49:21,796 main.py:39] Entering main; app id: jsdabbler-hrd    server type: Development
+DEBUG    2015-12-20 11:49:21,799 main.py:41] Leaving main
+INFO     2015-12-20 06:49:21,815 module.py:794] default: "GET /.record-data?temperature=19.75&humidity=43.24&compensated=44.02&vcc=3.38 HTTP/1.1" 404 52
+DEBUG    2015-12-20 12:46:27,470 main.py:39] Entering main; app id: jsdabbler-hrd    server type: Development
+DEBUG    2015-12-20 12:46:27,473 main.py:41] Leaving main
+INFO     2015-12-20 07:46:27,493 module.py:794] default: "GET /.record-data?temperature=20.19&humidity=43.27&compensated=43.99&vcc=3.38 HTTP/1.1" 404 52
+DEBUG    2015-12-20 13:43:33,177 main.py:39] Entering main; app id: jsdabbler-hrd    server type: Development
+DEBUG    2015-12-20 13:43:33,181 main.py:41] Leaving main
+INFO     2015-12-20 08:43:33,207 module.py:794] default: "GET /.record-data?temperature=20.49&humidity=43.36&compensated=44.04&vcc=3.38 HTTP/1.1" 404 52
