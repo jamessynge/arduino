@@ -1,33 +1,74 @@
 /*
+Author: James Synge
+Date: March, 2019
 
-This is adapted from the Arduino example:
+This is a demo of using the Arduino Ethernet and EthernetBonjour libraries,
+along with randomly generating the required Ethernet MAC address and using a
+randomly generated IP address if there is no DHCP server on the LAN. This is
+adapted from the Arduino example:
 
      Ethernet > BarometricPressureWebServer
 
-It demonstrates how to work with the Arduino Ethernet and EthernetBonjour
-libraries, with lots of printed status to help the reader understand what
-is going on at each step.
+The sketch prints a lot of status to the Serial port to help the reader
+understand what is going on at each step.
 
-The sketch uses the EEPROM library to store its randomly generated
-Ethernet address and, if necessary, its randomly generated IP address.
+The sketch uses the EEPROM library to store the generated Ethernet address and a
+randomly generated link-local IP address. The latter is only used if a DHCP
+server is unavailable. By storing these values, the sketch uses the same values
+each time it connects to the LAN, which makes working with it easier. Read more
+about these in addresses.cpp.
 
-An Ethernet shield (or an freetronics EtherTen board, which I've used to test
-this code) does not have its own MAC address (the unique identifier on the
-local Ethernet used to distinguish between the packets sent by this device
-from the packets sent by other devices on the Ethernet). Fortunately the
-design of MAC addresses allows for both globally unique addresses (i.e.
-assigned at the factory, unique world-wide) and locally unique addresses.
-This code will generate an address and store it in EEPROM.
-  
+analog_random.h/.cpp demonstrate how one can use the analog pins as source
+of random bits.
 
+eeprom_io.h/.cpp demonstrate how to write a structure to EEPROM and later
+safely read it back, with a name and a checksum used to ensure that the
+correct structure is being read.
 
-   TODO: Add use of EEPROM library, storing a generated MAC address
-   on first run, and if DHCP fails, storing a generated IP address.
-   Ideally we'd have some means of detecting the IP addresses in use
-   on the local network segment (e.g. by using Promiscuous mode), but
-   it doesn't appear that the Arduino Ethernet library supports this. 
+TO USE:
 
-   Author: James Synge
+1) Connect your Arduino to your computer (for uploading the sketch),
+   and connect the Arduino Ethernet shield (or similar) to your local
+   Ethernet. If necessary, connect a power supply to the Arduino (i.e.
+   USB isn't enough for powering the Ethernet shield).
+2) Open the Arduino IDE, select the correct type of board in the Tools
+   menu, and the correct port to which your Arduino is attached.
+3) Open the Serial Monitor, set it to 9600 baud.
+4) Load this sketch into your Arduino IDE, compile and upload to your
+   Arduino.
+5) Read the messages in the Serial Monitor showing what the sketch is doing.
+   For example:
+
+14:29:35.255 -> Using MAC address: 52-C4-58-43-37-4D
+14:29:35.288 -> Finding IP address via DHCP... assigned address: 192.168.86.48
+14:29:35.952 -> Ethernet hardware: W5100
+14:29:35.985 -> Link status: Unknown (only W5200 and W5500 can do this)
+14:29:38.276 -> Advertising name: sensor_ether_server
+
+6) Locate the board on your network by its mDNS name. For example:
+
+  $ ping sensor_ether_server.local
+  PING sensor_ether_server.local (192.168.86.48) 56(84) bytes of data.
+  64 bytes from wiznet43374d.lan (192.168.86.48): icmp_seq=1 ttl=128 time=0.559 ms
+
+7) Read from the HTTP server provided by the sketch:
+
+  $ curl sensor_ether_server.local
+  Temperature: 34.47 degrees C<br />
+  Pressure: 953.67 Pa<br />
+
+NOTE: Due to the size of the libraries, and all the print statements, this
+sketch uses most of the memory in a 32KB flash. If you are adapting it for
+working with your actual sensors, you may want to drop the print statements.
+
+TODO:
+* Determine if there is a way to detect whether our generated addresses
+  conflict with other devices on the network.
+* Figure out why D13 is blinking fast when running this sketch, instead of
+  blinking once a second as requested. Some library must be affecting it.
+* Figure out why the freetronics EtherTen seems to reset when I connect the
+  Serial Monitor.
+
 */
 
 // This is the Arduino "standard" Ethernet 2.0.0 library (or later).
@@ -41,19 +82,20 @@ This code will generate an address and store it in EEPROM.
 #include "analog_random.h"
 #include "eeprom_io.h"
 
-// // If we can't find a DHCP server to assign an address to us, we'll
-// // fallback to this static address.
-// IPAddress static_ip(192, 168, 86, 251);
+// Name we'll advertise using mDNS (Apple's Bonjour protocol).
+const char* kMulticastDnsName = "sensor_ether_server";
+
+// Keep track of whether we're using DHCP or not. If we are, then we need
+// to renew our lease on the allocated address periodically.
 bool using_dhcp = true;
 
-// Initialize the Ethernet server library
-// with the IP address and port you want to use
+// Initialize the Ethernet server library with the port you want to use
 // (port 80 is default for HTTP):
 EthernetServer server(80);
 
+// Fake sensor values.
 float temperature;
 float pressure;
-long lastReadingTime = 0;
 
 void setup() {
   // As described on the freetronics website, there is a delay between reset
@@ -62,28 +104,36 @@ void setup() {
   //
   //       https://www.freetronics.com.au/pages/usb-power-and-reset
 
-  long startTime = millis();
+  unsigned long startTime = millis();
 
   // Open serial communications and wait for host to start reading, but not
   // forever. This provides some time for the Arduino IDE Serial Monitor to
-  // start reading before too many messages (or any) have been printed.
+  // start reading before too many messages (or any) have been printed. Note:
+  // this doesn't really seem to do what I want, as I find that the freetronics
+  // board is resetting when I connect the serial monitor. Curious.
   Serial.begin(9600);
   unsigned long timeLimit = 10 * 1000UL;  // Wait at most 10 seconds.
-  while (!Serial && (millis() - startTime) < 10 * 1000UL) {
+  unsigned long waitUntil = startTime + timeLimit;
+  while (!Serial && (millis() < waitUntil)) {
     // Blink fast so that the person looking at the board can tell
     // the difference between this blink rate and some of the others.
     blink(200);
+    delay(1);
   }
+  // Serial.print("Waited ");
+  // Serial.print(millis() - startTime);
+  // Serial.println(" for the Serial line to ready.");
 
+  // Load the addresses saved to EEPROM, if they were previously saved.
   Addresses addresses;
   if (!addresses.load()) {
     Serial.println("Was NOT able to load Addresses.");
     addresses.generateAddresses();
 
-    // It *MAY* you identify devices on your network as using this software if
-    // they share a "Organizationally Unique Identifier" (the first 3 bytes of
-    // the MAC address). Let's do that here that, using values generated using
-    // a value from an online "locally administered mac address generator".
+    // It *MAY* help you identify devices on your network as using this software
+    // if they have the same "Organizationally Unique Identifier" (the first 3
+    // bytes of the MAC address). Let's do that here, using values from an
+    // online "locally administered mac address generator".
     addresses.mac[0] = 0x52;
     addresses.mac[1] = 0xC4;
     addresses.mac[2] = 0x58;
@@ -162,35 +212,39 @@ void setup() {
 
   printChangedLinkStatus();
 
-  if (EthernetBonjour.begin("rainsensor")) {
-    Serial.println("Advertising name 'rainsensor.local'");
+  if (EthernetBonjour.begin(kMulticastDnsName)) {
+    Serial.print("Advertising name: ");
+    Serial.println(kMulticastDnsName);
   } else {
     Serial.println("EthernetBonjour.begin FAILED!");
   }
 
+  // SOLELY for this demo, which is without real hardware, initialize the random
+  // number generator's seed, which we'll use to generate fake sensor readings.
+  seedRNG();
+  readFakeSensors();
+
   // start listening for clients
   server.begin();
 
-  // Give the sensor and Ethernet shield time to set up:
-  // NOT SURE THIS IS NECESSARY AT ALL.
-  startTime = millis();
-  
-  delay(1000);
+  // // Give the sensor and Ethernet shield time to set up. 
+  // // NOT SURE THIS IS NECESSARY AT ALL. E
+  // delay(1000);
+  // while (!Serial && (millis() - startTime) < 10 * 1000UL) {
+  //   blink(200);
+  // }
 
-  // Wait for serial port to connect. Needed for native USB port only.
-  while (!Serial && (millis() - startTime) < 10 * 1000UL) {
-    blink(200);
-  }
 
-  // SOLELY for this demo, without real hardware, initialize the random
-  // number generator's seed.
-  seedRNG();
+  // unsigned long timeLimit = 10 * 1000UL;  // Wait at most 10 seconds.
+  // unsigned long waitUntil = startTime + timeLimit;
+  // while (!Serial && (millis() < waitUntil)) {
+  //   // Blink fast so that the person looking at the board can tell
+  //   // the difference between this blink rate and some of the others.
+  //   blink(200);
+  //   delay(1);
+  // }
 
-  readFakeSensors();
 }
-
-unsigned long nextBlink = 0;
-bool ledIsOn = false;
 
 void printChangedLinkStatus() {
   static bool first = true;
@@ -233,54 +287,68 @@ void loop() {
   // OR NOTHING WILL WORK! Preferably, call it once per loop().
   EthernetBonjour.run();
 
-  // check for a reading no more than once a second.
-  if (millis() - lastReadingTime > 1000) {
-//    Serial.println("We should read from our FAKE sensor!");
-    readFakeSensors();
-    lastReadingTime = millis();
-  }
-
+  readFakeSensors();
   blink(1000);
 
   // listen for incoming Ethernet connections:
   listenForEthernetClients();
 }
 
+// Something is odd about the behavior here. If I just run blink(1000) and
+// nothing else, all is well, but if I run the rest of the demo too, then D13
+// blinks really fast, an is off most of the time. Not sure why yet.
 void blink(unsigned long interval) {
   static unsigned long lastBlink = 0;
+  static bool ledIsOn = false;
+
   unsigned long nextBlink = lastBlink + interval;
   unsigned long now = millis();
 
-//  Serial.print("lastBlink=");
-//  Serial.print(lastBlink);
-//  Serial.print(", nextBlink=");
-//  Serial.print(nextBlink);
-//  Serial.print(", now=");
-//  Serial.print(now);
+//#define DEBUG_BLINK
+#ifdef DEBUG_BLINK
+  Serial.print("interval=");
+  Serial.print(interval);
+  Serial.print(", lastBlink=");
+  Serial.print(lastBlink);
+  Serial.print(", nextBlink=");
+  Serial.print(nextBlink);
+  Serial.print(", now=");
+  Serial.print(now);
+#endif  // DEBUG_BLINK
 
   if (nextBlink < lastBlink) {
     // Wrapped around.
     if (now >= lastBlink) {
-      // Serial.println("   millis hasn't wrapped yet, so not time.");
+#ifdef DEBUG_BLINK
+      Serial.println("   millis hasn't wrapped yet, so not time.");
+#endif  // DEBUG_BLINK
       return;
     } else if (now < nextBlink) {
-//      Serial.println("   Wrapped, but not time yet.");
+#ifdef DEBUG_BLINK
+      Serial.println("   Wrapped, but not time yet.");
+#endif  // DEBUG_BLINK
       return;
     }
   } else if (now < lastBlink) {
     // Clock has wrapped around, so past due for blinking!
   } else if (now < nextBlink) {
     // Not time yet.
-//    Serial.println("   Not time yet.");
+#ifdef DEBUG_BLINK
+    Serial.println("   Not time yet.");
+#endif  // DEBUG_BLINK
     return;
   }
-
-  digitalWrite(LED_BUILTIN, ledIsOn ? LOW : HIGH);
+  int pinValue = ledIsOn ? LOW : HIGH;
+  digitalWrite(LED_BUILTIN, pinValue);
   ledIsOn = !ledIsOn;
   lastBlink = now;
-//  Serial.println("    BLINK!");
+#ifdef DEBUG_BLINK
+  Serial.print("    BLINK!   ledIsOn=");
+  Serial.print(ledIsOn);
+  Serial.print("pinValue=");
+  Serial.println(pinValue);
+#endif  // DEBUG_BLINK
 }
-
 
 void listenForEthernetClients() {
   // listen for incoming clients
@@ -328,8 +396,9 @@ void listenForEthernetClients() {
 }
 
 void seedRNG() {
+  AnalogRandom rng;
   for (int loop = 0; loop < 10; ++loop) {
-    if (AnalogRandom.seedArduinoRNG()) {
+    if (rng.seedArduinoRNG()) {
       break;
     }
   }
@@ -337,6 +406,22 @@ void seedRNG() {
 
 void readFakeSensors() {
   static bool first = true;
+  static unsigned long lastReadingTime = 0;
+
+  unsigned long now = millis();
+  if (!first) {
+    // Check for a reading no more than once a second.
+    if (lastReadingTime > now) {
+      // The clock has wrapped. Not attempting perfect spacing here.
+      lastReadingTime = 0;
+    }
+    unsigned long elapsed = now - lastReadingTime;
+    if (elapsed < 1000) {
+      // Too soon.
+      return;
+    }
+  } 
+  lastReadingTime = now;
 
   float t = random(-400, 1200) / 10.0;
   float p = random(800, 1100);

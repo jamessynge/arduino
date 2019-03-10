@@ -11,9 +11,14 @@ namespace {
 // the addresses is allocated.
 const char kName[] = "addrs";
 
-// Pick a MAC address for the Ethernet interface. Since the Arduino
-// doesn't have its own MAC address assigned at the factory, we must
-// pick one. Read more about the issue here:
+// An Arduino Ethernet shield (or an freetronics EtherTen board, which I've used
+// to test this code) does not have its own MAC address (the unique identifier
+// used to distinguish one Ethernet device from another). Fortunately the design
+// of MAC addresses allows for both globally unique addresses (i.e. assigned at
+// the factory, unique world-wide) and locally unique addresses. This code will
+// generate an address in the range allowed for local administered addresses and
+// store it in EEPROM. Note though that there is no support here for probing to
+// ensure that the allocated address is free. Read more about the issue here:
 //
 //     https://serverfault.com/a/40720
 //     https://en.wikipedia.org/wiki/MAC_address#Universal_vs._local
@@ -28,21 +33,9 @@ const char kName[] = "addrs";
 //     significant byte is 02h. The binary is 00000010 and the second
 //     least significant bit is 1. Therefore, it is a locally
 //     administered address. The bit is 0 in all OUIs.
-//
-// So, we ensure the low-nibble of the first byte is one of these 8
-// hexidecimal values:
-//
-//    2  == 0010b
-//    3  == 0011b
-//    6  == 0110b
-//    7  == 0111b
-//    a  == 1010b
-//    b  == 1011b
-//    e  == 1110b
-//    f  == 1111b
-bool pickMACAddress(byte mac[6]) {
+bool pickMACAddress(byte mac[6], AnalogRandom* rng) {
   for (int i = 0; i < 6; ++i) {
-    int r = AnalogRandom.randomByte();
+    int r = rng->randomByte();
     if (r < 0) {
       return false;
     }
@@ -74,16 +67,17 @@ bool Addresses::load() {
 }
 
 void Addresses::generateAddresses() {
-  pickMACAddress(mac);
+  AnalogRandom rng;
+  pickMACAddress(mac, &rng);
 
   // A link-local address is in the range 169.254.1.0 to 169.254.254.255,
   // inclusive. Learn more: https://tools.ietf.org/html/rfc3927
   // Also known as Automatic Private IP Addressing.
   int c;
   do {
-    c = AnalogRandom.randomByte();
+    c = rng.randomByte();
   } while (!(c >= 1 && c <= 254));
   int d;
-  while ((d = AnalogRandom.randomByte()) < 0);
+  while ((d = rng.randomByte()) < 0);
   ip = IPAddress(169, 254, c, d);
 }
