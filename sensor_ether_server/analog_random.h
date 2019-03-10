@@ -10,9 +10,14 @@ class AnalogRandomClass {
     // of analog pins.
     int randomBit(int readLimit=100);
 
+    // Returns an 8-bit random value, produced by calling randomBit
+    // 8 times. Returns -1 if there was not enough randomness available
+    // for any of the bits.
+    int randomByte(int perBitReadLimit=100);
+
     // Returns an unsigned 32-bit random value, produced by calling randomBit
-    // at least 32 times. zero is return if there was not enough randomness
-    // available for any of the pins.
+    // 32 times. zero is returned if there was not enough randomness available
+    // for any of the bits.
     uint32_t random32(int perBitReadLimit=100);
 
     // Set the seed for the Arduino random number generator using the analog
@@ -21,9 +26,7 @@ class AnalogRandomClass {
     bool seedArduinoRNG();
 
   private:
-    // static int convertAnalogPinNum(int pinNum);
-    // static int readAnalogPinNum(int pinNum);
-
+    // We cycle through the analog pins; this is the next one to read.
     int next_pin_ = 0;
 };
 

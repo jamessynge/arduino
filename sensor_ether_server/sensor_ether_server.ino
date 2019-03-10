@@ -37,55 +37,13 @@ This code will generate an address and store it in EEPROM.
 // https://github.com/jamessynge/EthernetBonjour
 #include <EthernetBonjour.h>
 
+#include "addresses.h"
 #include "analog_random.h"
+#include "eeprom_io.h"
 
-// Assign a MAC address for the Ethernet controller. Since the Arduino
-// doesn't have its own MAC address assigned at the factory, you must
-// pick one. Read more:
-//
-//     https://serverfault.com/a/40720
-//     https://en.wikipedia.org/wiki/MAC_address#Universal_vs._local
-//
-// Quoting:
-//
-//     Universally administered and locally administered addresses are
-//     distinguished by setting the second least significant bit of the
-//     most significant byte of the address. If the bit is 0, the address
-//     is universally administered. If it is 1, the address is locally
-//     administered. In the example address 02-00-00-00-00-01 the most
-//     significant byte is 02h. The binary is 00000010 and the second
-//     least significant bit is 1. Therefore, it is a locally
-//     administered address. The bit is 0 in all OUIs.
-//
-// So, ensure the low-nibble of the first byte is one of these 8
-// hexidecimal values:
-//
-//    2  == 0010b
-//    3  == 0011b
-//    6  == 0110b
-//    7  == 0111b
-//    a  == 1010b
-//    b  == 1011b
-//    e  == 1110b
-//    f  == 1111b
-//
-// There are websites that will generate these for you. Search for:
-//
-//    locally administered mac address generator
-//
-// TODO(james): Consider storing the address in the Arduino's EEPROM,
-// generating a random address if it isn't there when first started.
-// That would allow for this sketch to be copied many times, and used
-// without editing.
-
-// Fill in your address here:
-byte mac[] = {
-  0x52, 0xC4, 0x58, 0xC7, 0x2E, 0x81
-};
-
-// If we can't find a DHCP server to assign an address to us, we'll
-// fallback to this static address.
-IPAddress static_ip(192, 168, 86, 251);
+// // If we can't find a DHCP server to assign an address to us, we'll
+// // fallback to this static address.
+// IPAddress static_ip(192, 168, 86, 251);
 bool using_dhcp = true;
 
 // Initialize the Ethernet server library
@@ -112,12 +70,29 @@ void setup() {
   Serial.begin(9600);
   unsigned long timeLimit = 10 * 1000UL;  // Wait at most 10 seconds.
   while (!Serial && (millis() - startTime) < 10 * 1000UL) {
-    // Blink fast so that the person looking at it can tell the difference
-    // between this blink rate and some of the others.
+    // Blink fast so that the person looking at the board can tell
+    // the difference between this blink rate and some of the others.
     blink(200);
   }
 
-  Serial.println("Setting up Ethernet pins");
+  Addresses addresses;
+  if (!addresses.load()) {
+    Serial.println("Was NOT able to load Addresses.");
+    addresses.generateAddresses();
+
+    // It *MAY* you identify devices on your network as using this software if
+    // they share a "Organizationally Unique Identifier" (the first 3 bytes of
+    // the MAC address). Let's do that here that, using values generated using
+    // a value from an online "locally administered mac address generator".
+    addresses.mac[0] = 0x52;
+    addresses.mac[1] = 0xC4;
+    addresses.mac[2] = 0x58;
+
+    addresses.save();
+  }
+  Serial.print("Using MAC address: ");
+  printMACAddress(addresses.mac);
+  Serial.println();
 
   // Tell the Ethernet library which pin to use for CS (Chip Select). SPI
   // buses (as used by the Wiznet W5000 series Ethernet chips) use 3 common
@@ -130,52 +105,58 @@ void setup() {
   //Ethernet.init(15);  // ESP8266 with Adafruit Featherwing Ethernet
   //Ethernet.init(33);  // ESP32 with Adafruit Featherwing Ethernet
 
-  Serial.println("Setting up Ethernet library");
-  if (Ethernet.begin(mac)) {
+  Serial.print("Finding IP address via DHCP... ");
+  if (Ethernet.begin(addresses.mac)) {
     using_dhcp = true;
-    Serial.print("DHCP successful, assigned address:");
+    Serial.print("assigned address: ");
     Serial.println(Ethernet.localIP());
   } else {
     using_dhcp = false;
-    Serial.print("Unable to get an IP address via DHCP. Using fixed address: ");
-    Serial.println(static_ip);
-    Ethernet.setLocalIP(static_ip);
+    Serial.print("no response! Using fixed address: ");
+    Serial.println(addresses.ip);
+    Ethernet.setLocalIP(addresses.ip);
 
-    // Assume that the subnet is a /24, with this mask:
-    IPAddress subnet(255, 255, 255, 0);
+    // The link-local address range must not be divided into smaller
+    // subnets, so we set our subnet mask accordingly:
+    IPAddress subnet(255, 255, 0, 0);
     Ethernet.setSubnetMask(subnet);
 
-    // Assume that the gateway is on the same subnet, but with the
-    // last byte of the address being '1':
-    IPAddress gateway = static_ip;
-    gateway[3] = 1;
+    // Assume that the gateway is on the same subnet, at address 1 within
+    // the subnet. This code will work with many subnets, not just a /16.
+    IPAddress gateway = addresses.ip;
+    gateway[0] &= subnet[0];
+    gateway[1] &= subnet[1];
+    gateway[2] &= subnet[2];
+    gateway[3] &= subnet[3];
+    gateway[3] |= 1;
     Ethernet.setGatewayIP(gateway);
   }
 
-  switch(Ethernet.hardwareStatus()) {
+  Serial.print("Ethernet hardware: ");
+  auto hwStatus = Ethernet.hardwareStatus();
+  switch(hwStatus) {
     case EthernetNoHardware:
+      Serial.println("NOT FOUND!");
       while (true) {
-        Serial.println("Ethernet hardware was not found!");
-        Serial.println("Sorry, can't run without it. :(");
-        Serial.println();
-        delay(1000); // do nothing, no point running without Ethernet hardware
+        Serial.println("Sorry, can't run without Ethernet. :(");
+        delay(1000); // do nothing, no point running without Ethernet hardware.
       }
 
     case EthernetW5100:
-      Serial.println("W5100 Ethernet controller detected.");
+      Serial.println("W5100");
       break;
 
     case EthernetW5200:
-      Serial.println("W5200 Ethernet controller detected.");
+      Serial.println("W5200");
       break;
 
     case EthernetW5500:
-      Serial.println("W5500 Ethernet controller detected.");
+      Serial.println("W5500");
       break;
 
     default:
-      Serial.print("Other Ethernet controller detected: ");
-      Serial.println(Ethernet.hardwareStatus());
+      Serial.print("unfamiliar device detected, id: 0x");
+      Serial.println(hwStatus, HEX);
       break;
   }
 
@@ -224,7 +205,7 @@ void printChangedLinkStatus() {
   Serial.print("Link status: ");
   switch (status) {
     case Unknown:
-      Serial.println("Unknown. Link status detection is only available with W5200 and W5500.");
+      Serial.println("Unknown (only W5200 and W5500 can do this)");
       break;
     case LinkON:
       Serial.println("ON");
@@ -352,127 +333,6 @@ void seedRNG() {
       break;
     }
   }
-
-
-//   // This is based on:
-//   //   http://www.utopiamechanicus.com/article/better-arduino-random-numbers/
-//   // which in turn is based on earlier work, at least back to Alan Turing.
-//   // The idea is that we can "debias" a biased source of numbers (e.g. an
-//   // unfair coin) by taking two readings at a time rather than one, each
-//   // reading producing 1 bit. If the values are:
-//   //   0,0: Try again
-//   //   0,1: Output a 1
-//   //   1,0, Output a 0
-//   //   1,1: Try again.
-//   // We use the analog pins as our source of biased readings. We'll cycle
-//   // through all of the available analog pins just in case some are well
-//   // grounded, so not producing any noise.
-
-// #define DEBUG_SEED_RNG
-// #ifdef DEBUG_SEED_RNG
-//   unsigned long startMicros = micros();
-// #endif  // DEBUG_SEED_RNG
-
-//   // randomSeed takes an unsigned long, which which determines the number
-//   // of bits we need.
-//   int neededBits = 8 * sizeof(unsigned long);
-
-//   // Initialize with a previously generated randomly value just in case we
-//   // can't get all the bits we need (i.e. the analog pins are too stable).
-//   unsigned long seed = 0x43a61ac0;
-
-//   // ATmega's can perform analogRead about 10K times per second, so let's
-//   // limit to that number of analog reads so this doesn't take too long.
-//   int loopLimit = 5000;  // Two reads per loop.
-
-//   // A lookup table from integer (pin number) to the corresponding analog pin
-//   // identifier (i.e. A0 should not be assumed to be zero). Using the macro
-//   // NUM_ANALOG_INPUTS to determine how many analog pins are available, and
-//   // hence build the table's values.
-
-// #ifndef NUM_ANALOG_INPUTS
-// #error Expected NUM_ANALOG_INPUTS to be a C preprocessor macro.
-// #endif
-
-//   int pinTable[] = {
-//     A0, A1, A2,
-// #if NUM_ANALOG_INPUTS > 3
-//     A3,
-// #endif
-// #if NUM_ANALOG_INPUTS > 4
-//     A4,
-// #endif
-// #if NUM_ANALOG_INPUTS > 5
-//     A5,
-// #endif
-// #if NUM_ANALOG_INPUTS > 6
-//     A6,
-// #endif
-// #if NUM_ANALOG_INPUTS > 7
-//     A7,
-// #endif
-// #if NUM_ANALOG_INPUTS > 8
-//     A8,
-// #endif
-// #if NUM_ANALOG_INPUTS > 9
-//     A9,
-// #endif
-// #if NUM_ANALOG_INPUTS > 10
-//     A10,
-// #endif
-// #if NUM_ANALOG_INPUTS > 11
-//     A11,
-// #endif
-// #if NUM_ANALOG_INPUTS > 12
-//     A12,
-// #endif
-// #if NUM_ANALOG_INPUTS > 13
-//     A13,
-// #endif
-// #if NUM_ANALOG_INPUTS > 14
-//     A14,
-// #endif
-//   };
-//   int numPins = sizeof pinTable / sizeof pinTable[0];
-// #ifdef DEBUG_SEED_RNG
-//   Serial.print("seedRNG: numPins=");
-//   Serial.print(numPins);
-//   Serial.print("   pinTable=[");
-//   for (int i = 0; i < numPins; ++i) {
-//     if (i > 0) {
-//       Serial.print(", ");
-//     }
-//     Serial.print(pinTable[i], DEC);
-//   }
-//   Serial.println("]");
-// #endif  // DEBUG_SEED_RNG
-
-//   while ((neededBits > 0) && (loopLimit-- > 0)) {
-//     int pinNum = loopLimit % numPins;
-//     int pinId = pinTable[pinNum];
-//     int bit0= analogRead(pinId) & 1;
-//     int bit1= analogRead(pinId) & 1;
-//     if (bit1!=bit0) {
-//       seed = (seed<<1) | bit1;
-//       --neededBits;
-//     }
-//   }
-
-// #ifdef DEBUG_SEED_RNG
-//   unsigned long endMicros = micros();
-//   unsigned long elapsedMicros = endMicros - startMicros;
-//   Serial.print("seedRNG: neededBits=");
-//   Serial.print(neededBits);
-//   Serial.print("   loopLimit=");
-//   Serial.print(loopLimit);
-//   Serial.print("   elapsedMicros=");
-//   Serial.print(elapsedMicros);
-//   Serial.print("   seed=0x");
-//   Serial.print(seed, HEX);
-//   Serial.println();
-// #endif  // DEBUG_SEED_RNG
-
-//   randomSeed(seed);
 }
 
 void readFakeSensors() {
