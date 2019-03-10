@@ -45,6 +45,8 @@ static const int kAnalogPinTable[] = {
 };
 
 constexpr int kNumAnalogPins = sizeof kAnalogPinTable / sizeof kAnalogPinTable[0];
+// We store next_pin_ in a byte, so make sure we don't have too many pins.
+static_assert(kNumAnalogPins <= 256, "Too many pins!");
 
 int AnalogRandomClass::randomBit(int readLimit) {
   // This is based on:

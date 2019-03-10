@@ -27,7 +27,7 @@ class AnalogRandomClass {
 
   private:
     // We cycle through the analog pins; this is the next one to read.
-    int next_pin_ = 0;
+    uint8_t next_pin_ = 0;
 };
 
 extern AnalogRandomClass AnalogRandom;
