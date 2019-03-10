@@ -66,8 +66,6 @@ TODO:
   conflict with other devices on the network.
 * Figure out why D13 is blinking fast when running this sketch, instead of
   blinking once a second as requested. Some library must be affecting it.
-* Figure out why the freetronics EtherTen seems to reset when I connect the
-  Serial Monitor.
 
 */
 
@@ -98,38 +96,24 @@ float temperature;
 float pressure;
 
 void setup() {
-  // As described on the freetronics website, there is a delay between reset
-  // of the microcontroller and the ethernet chip. Do some other stuff first
-  // so that we don't try initializing the Ethernet chip too soon.
+  // As described on the freetronics website, there is a delay between the reset
+  // of the EtherTen board and the time when the Ethernet chip is allowed to
+  // operate. Do some other stuff first so that we don't try initializing the
+  // Ethernet chip too soon.
   //
   //       https://www.freetronics.com.au/pages/usb-power-and-reset
-
   unsigned long startTime = millis();
 
-  // Open serial communications and wait for host to start reading, but not
-  // forever. This provides some time for the Arduino IDE Serial Monitor to
-  // start reading before too many messages (or any) have been printed. Note:
-  // this doesn't really seem to do what I want, as I find that the freetronics
-  // board is resetting when I connect the serial monitor. Curious.
-  Serial.begin(9600);
-  unsigned long timeLimit = 10 * 1000UL;  // Wait at most 10 seconds.
-  unsigned long waitUntil = startTime + timeLimit;
-  while (!Serial && (millis() < waitUntil)) {
-    // Blink fast so that the person looking at the board can tell
-    // the difference between this blink rate and some of the others.
-    blink(200);
-    delay(1);
-  }
-  // Serial.print("Waited ");
-  // Serial.print(millis() - startTime);
-  // Serial.println(" for the Serial line to ready.");
+  // SOLELY for this demo, which is without real hardware, initialize the random
+  // number generator's seed, which we'll use to generate fake sensor readings.
+  seedRNG();
 
-  // Load the addresses saved to EEPROM, if they were previously saved.
+  // Load the addresses saved to EEPROM, if they were previously saved. If they
+  // were not successfully loaded, then generate them.
   Addresses addresses;
-  if (!addresses.load()) {
-    Serial.println("Was NOT able to load Addresses.");
-    addresses.generateAddresses();
-
+  bool loadedAddresses = addresses.load();
+  bool generatedAddresses = !loadedAddresses && addresses.generateAddresses();
+  if (generatedAddresses) {
     // It *MAY* help you identify devices on your network as using this software
     // if they have the same "Organizationally Unique Identifier" (the first 3
     // bytes of the MAC address). Let's do that here, using values from an
@@ -137,10 +121,35 @@ void setup() {
     addresses.mac[0] = 0x52;
     addresses.mac[1] = 0xC4;
     addresses.mac[2] = 0x58;
-
     addresses.save();
   }
-  Serial.print("Using MAC address: ");
+
+  // Open serial communications and wait for host to start reading, but not
+  // forever. This provides some time for the Arduino IDE Serial Monitor to
+  // start reading before too many messages (or any) have been printed. Note
+  // that many Arduinos reset when the host computer connects to the serial
+  // device, so when debugging it will usually be the case that the device
+  // is ready right away. And if not debugging (i.e. embedded somewhere with
+  // nobody connected to the serial device), then any time we spend here is
+  // just wasted... except it allows us to burn the time until the Ethernet
+  // chip is available.
+  Serial.begin(9600);
+  unsigned long waitUntil = startTime + 200;  // Allow up to 200ms from boot.
+  while (!Serial && (millis() < waitUntil)) {
+    // Blink fast so that the person looking at the board can tell
+    // the difference between this blink rate and some of the others.
+    blink(50);
+    delay(1);
+  }
+
+  if (!loadedAddresses) {
+    if (!generatedAddresses) {
+      announceFailure("Unable to load or generate MAC and IP addresses!");
+    }
+    Serial.println("Generated random MAC and IP addresses.");
+  }
+
+  Serial.print("MAC address: ");
   printMACAddress(addresses.mac);
   Serial.println();
 
@@ -187,10 +196,7 @@ void setup() {
   switch(hwStatus) {
     case EthernetNoHardware:
       Serial.println("NOT FOUND!");
-      while (true) {
-        Serial.println("Sorry, can't run without Ethernet. :(");
-        delay(1000); // do nothing, no point running without Ethernet hardware.
-      }
+      announceFailure("Sorry, can't run without Ethernet. :(");
 
     case EthernetW5100:
       Serial.println("W5100");
@@ -205,7 +211,7 @@ void setup() {
       break;
 
     default:
-      Serial.print("unfamiliar device detected, id: 0x");
+      Serial.print("unfamiliar id: 0x");
       Serial.println(hwStatus, HEX);
       break;
   }
@@ -219,36 +225,21 @@ void setup() {
     Serial.println("EthernetBonjour.begin FAILED!");
   }
 
-  // SOLELY for this demo, which is without real hardware, initialize the random
-  // number generator's seed, which we'll use to generate fake sensor readings.
-  seedRNG();
+  // Choose initial values for the fake sensors.
   readFakeSensors();
 
-  // start listening for clients
+  // Start listening for clients
   server.begin();
-
-  // // Give the sensor and Ethernet shield time to set up. 
-  // // NOT SURE THIS IS NECESSARY AT ALL. E
-  // delay(1000);
-  // while (!Serial && (millis() - startTime) < 10 * 1000UL) {
-  //   blink(200);
-  // }
-
-
-  // unsigned long timeLimit = 10 * 1000UL;  // Wait at most 10 seconds.
-  // unsigned long waitUntil = startTime + timeLimit;
-  // while (!Serial && (millis() < waitUntil)) {
-  //   // Blink fast so that the person looking at the board can tell
-  //   // the difference between this blink rate and some of the others.
-  //   blink(200);
-  //   delay(1);
-  // }
-
 }
 
 void printChangedLinkStatus() {
   static bool first = true;
   static EthernetLinkStatus last_status = Unknown;
+
+  if (Ethernet.hardwareStatus() == EthernetW5100) {
+    // No point in checking, a W5100 can't report link status.
+    return;
+  }
 
   EthernetLinkStatus status = Ethernet.linkStatus();
   if (!first && status == last_status) {
@@ -259,7 +250,7 @@ void printChangedLinkStatus() {
   Serial.print("Link status: ");
   switch (status) {
     case Unknown:
-      Serial.println("Unknown (only W5200 and W5500 can do this)");
+      Serial.println("Unknown");
       break;
     case LinkON:
       Serial.println("ON");
@@ -273,18 +264,24 @@ void printChangedLinkStatus() {
 void loop() {
   printChangedLinkStatus();
 
-  // If got address via DHCP, this will renew the lease.
+  // If we're using an IP address assigned via DHCP, renew the lease
+  // periodically. The library will do so at the appropriate interval if we
+  // call it often enough.
   if (using_dhcp) {
     switch (Ethernet.maintain()) {
       case 1: // Renew failed
       case 3: // Rebind failed
         Serial.println("WARNING! lost our DHCP assigned address!");
         // MIGHT want to just return at this point, since the rest won't work.
+        // Or for a very robust product, use a digital output pin connected to
+        // the RESET pin, and force the Arduino to reset if it loses its lease.
+        // It can then start over requesting an address via DHCP, or fallback
+        // to its randomly generated link-local address.
     }
   }
 
-  // This actually runs the Bonjour module. YOU HAVE TO CALL THIS PERIODICALLY,
-  // OR NOTHING WILL WORK! Preferably, call it once per loop().
+  // If we've received an mDNS query for our name, respond. This must be called
+  // often in order to for the mDNS feature to work, ideally once per loop.
   EthernetBonjour.run();
 
   readFakeSensors();
@@ -351,48 +348,56 @@ void blink(unsigned long interval) {
 }
 
 void listenForEthernetClients() {
-  // listen for incoming clients
+  // Is there a client that connected since we last checked?
   EthernetClient client = server.available();
-  if (client) {
-    Serial.println("Got a client!!");
-    // an http request ends with a blank line
-    boolean currentLineIsBlank = true;
-    while (client.connected()) {
-      if (client.available()) {
-        char c = client.read();
-        Serial.print(c);
-        // if you've gotten to the end of the line (received a newline
-        // character) and the line is blank, the http request has ended,
-        // so you can send a reply
-        if (c == '\n' && currentLineIsBlank) {
-          // send a standard http response header
-          client.println("HTTP/1.1 200 OK");
-          client.println("Content-Type: text/html");
-          client.println();
-          // print the current readings, in HTML format:
-          client.print("Temperature: ");
-          client.print(temperature);
-          client.print(" degrees C");
-          client.println("<br />");
-          client.print("Pressure: " + String(pressure));
-          client.print(" Pa");
-          client.println("<br />");
-          break;
-        }
-        if (c == '\n') {
-          // you're starting a new line
-          currentLineIsBlank = true;
-        } else if (c != '\r') {
-          // you've gotten a character on the current line
-          currentLineIsBlank = false;
-        }
+  if (!client) {
+    return;
+  }
+  Serial.println("Got a client!!");
+  // We take an EXTREMELY simple approach to "parsing" (consuming) the HTTP
+  // request: we read until we get a blank line, as every HTTP request header
+  // block ends with \r\n\r\n (i.e. two line endings). We assume that the
+  // request is not a PUT or POST, i.e. has no body, and we certainly don't
+  // try to read it.
+  boolean currentLineIsBlank = true;
+  while (client.connected()) {
+    if (client.available()) {
+      char c = client.read();
+      // As a debugging aid, print every character in the HTTP request header.
+      Serial.print(c);
+      // If you've gotten to the end of the line (received a newline
+      // character) and the line is blank, the HTTP request has ended,
+      // so you can send a reply.
+      if (c == '\n' && currentLineIsBlank) {
+        // Send a standard http response header
+        client.println("HTTP/1.1 200 OK");
+        client.println("Content-Type: text/html");
+        client.println();
+        // Print the current readings, in HTML format:
+        client.print("Temperature: ");
+        client.print(temperature);
+        client.print(" degrees C");
+        client.println("<br/>");
+        client.print("Pressure: " + String(pressure));
+        client.print(" Pa");
+        client.println("<br/>");
+        break;
+      }
+      if (c == '\n') {
+        // you're starting a new line
+        currentLineIsBlank = true;
+      } else if (c != '\r') {
+        // you've gotten a character on the current line
+        currentLineIsBlank = false;
       }
     }
-    // give the web browser time to receive the data
-    delay(1);
-    // close the connection:
-    client.stop();
   }
+  // Give the web browser time to receive the data.
+  // NOT SURE WHY THIS IS HERE. Maybe the Ethernet chip will drop pending data
+  // if we close too early?
+  delay(1);
+  // Close the TCP connection.
+  client.stop();
 }
 
 void seedRNG() {
@@ -442,4 +447,11 @@ void readFakeSensors() {
 //  Serial.print(pressure);
 //  Serial.println(" hPa");
 //  Serial.println();
+}
+
+void announceFailure(const char* message) {
+  while (true) {
+    Serial.println(message);
+    delay(1000); // do nothing, no point running without Ethernet hardware.
+  }
 }

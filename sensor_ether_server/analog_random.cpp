@@ -109,17 +109,6 @@ int AnalogRandom::randomByte(int perBitReadLimit) {
   } else {
     return -1;
   }
-  // int result = 0;
-  // for (int i = 0; i < 8; ++i) {
-  //   int bit = randomBit(perBitReadLimit);
-  //   if (bit < 0) {
-  //     // Not enough randomness found to produce a single bit. Let the
-  //     // caller know.
-  //     return -1;
-  //   }
-  //   result = (result << 1) | bit;
-  // }
-  // return result;
 }
 
 uint32_t AnalogRandom::random32(int perBitReadLimit) {
@@ -129,17 +118,6 @@ uint32_t AnalogRandom::random32(int perBitReadLimit) {
   } else {
     return 0;
   }
-  // uint32_t result = 0;
-  // for (int i = 0; i < 32; ++i) {
-  //   int bit = randomBit(perBitReadLimit);
-  //   if (bit < 0) {
-  //     // Not enough randomness found to produce a single bit. Let the
-  //     // caller know.
-  //     return 0;
-  //   }
-  //   result = (result << 1) | bit;
-  // }
-  // return result;
 }
 
 bool AnalogRandom::randomBits(int numBits, int perBitReadLimit, uint32_t* output) {
@@ -155,8 +133,6 @@ bool AnalogRandom::randomBits(int numBits, int perBitReadLimit, uint32_t* output
   *output = result;
   return true;
 }
-
-
 
 bool AnalogRandom::seedArduinoRNG() {
   uint32_t seed = random32();

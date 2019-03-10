@@ -48,6 +48,29 @@ bool pickMACAddress(byte mac[6], AnalogRandom* rng) {
   return true;
 }
 
+// A link-local address is in the range 169.254.1.0 to 169.254.254.255,
+// inclusive. Learn more: https://tools.ietf.org/html/rfc3927
+bool pickIPAddress(IPAddress* output, AnalogRandom* rng) {
+  auto r = rng->random32();
+  if (r == 0) {
+    return false;
+  }
+  r >>= 1;
+  int c = (r % 254) + 1;
+
+  r = rng->random32();
+  if (r == 0) {
+    return false;
+  }
+  r >>= 1;
+  int d = r & 0xff;
+
+  output[0] = 169;
+  output[1] = 254;
+  output[2] = c;
+  output[3] = d;
+  return true;
+}
 }  // namespace
 
 void printMACAddress(byte mac[6]) {
@@ -66,18 +89,15 @@ bool Addresses::load() {
   return readStructFromEEPROM(kName, this);
 }
 
-void Addresses::generateAddresses() {
+bool Addresses::generateAddresses() {
   AnalogRandom rng;
-  pickMACAddress(mac, &rng);
-
-  // A link-local address is in the range 169.254.1.0 to 169.254.254.255,
-  // inclusive. Learn more: https://tools.ietf.org/html/rfc3927
-  // Also known as Automatic Private IP Addressing.
-  int c;
-  do {
-    c = rng.randomByte();
-  } while (!(c >= 1 && c <= 254));
-  int d;
-  while ((d = rng.randomByte()) < 0);
-  ip = IPAddress(169, 254, c, d);
+  if (!pickMACAddress(mac, &rng)) {
+    // Unable to find enough randomness.
+    return false;
+  }
+  if (!pickIPAddress(&ip, &rng)) {
+    // Unable to find enough randomness.
+    return false;
+  }
+  return true;
 }
