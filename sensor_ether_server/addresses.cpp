@@ -4,6 +4,11 @@
 #include "eeprom_io.h"
 
 namespace {
+// This is the name used to identify the data stored in the EEPROM.
+// Changing the value (e.g. between "addrs" and "Addrs") has the
+// effect of invalidating the currently stored values, which can
+// be useful if you want to change the space from whicn one or both
+// the addresses is allocated.
 const char kName[] = "addrs";
 
 // Pick a MAC address for the Ethernet interface. Since the Arduino
