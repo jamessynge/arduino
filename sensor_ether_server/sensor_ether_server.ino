@@ -281,7 +281,7 @@ void loop() {
   }
 
   // If we've received an mDNS query for our name, respond. This must be called
-  // often in order to for the mDNS feature to work, ideally once per loop.
+  // often in order for the mDNS feature to work, ideally once per loop.
   EthernetBonjour.run();
 
   readFakeSensors();
