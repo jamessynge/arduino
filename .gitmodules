@@ -1,3 +1,6 @@
 [submodule "Libraries/EthernetBonjour"]
 	path = Libraries/EthernetBonjour
 	url = ../EthernetBonjour
+[submodule "Libraries/SparkFun_MLX90614_Arduino"]
+	path = Libraries/SparkFun_MLX90614_Arduino
+	url = https://github.com/sparkfun/SparkFun_MLX90614_Arduino_Library.git
