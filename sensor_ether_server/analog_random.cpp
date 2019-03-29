@@ -113,8 +113,8 @@ int AnalogRandom::randomByte(int perBitReadLimit) {
 
 uint32_t AnalogRandom::random32(int perBitReadLimit) {
   uint32_t result;
-  if (randomBits(8, perBitReadLimit, &result)) {
-    return result & 0xff;
+  if (randomBits(32, perBitReadLimit, &result)) {
+    return result;
   } else {
     return 0;
   }
