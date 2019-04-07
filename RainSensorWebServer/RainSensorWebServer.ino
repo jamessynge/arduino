@@ -155,14 +155,17 @@
 // Library for reading from the MLX90614 IR Sensor.
 #include <SparkFunMLX90614.h>
 
-// My wrapper class for simplifying dealing with the Ethernet library.
-#include "simple_http_server.h"
+// Generates, stores and loads MAC and IP address for the sketch.
+#include "addresses.h"
+
+// C Preprocessor macros for debugging.
+#include "debug.h"
 
 // Provides the seed for the standard random number generator.
 #include "jitter_random.h"
 
-// Generates, stores and loads MAC and IP address for the sketch.
-#include "addresses.h"
+// My wrapper class for simplifying dealing with the Ethernet library.
+#include "simple_http_server.h"
 
 // Pin hooked up to the RG-11 rain sensor's relay.
 constexpr int kRelayInputPin = 7;
@@ -176,6 +179,11 @@ const char kMulticastDnsName[] = "rainsensor";
 // Tell the Ethernet library to talk to the Ethernet chip using the
 // appropriate chip select pin, and to listen on port 80 for TCP connections.
 SimpleHttpServer server(kEthernetShieldCS, 80);
+
+// Forward declarations. Not necessary in an Arduino sketch, but appropriate
+// for C & C++.
+void announceFailure(const char* message);
+void initializeRandomSeed();
 
 void setup() {
   Serial.begin(9600);
@@ -193,18 +201,7 @@ void setup() {
 
   // Initialize the random number generator, just in case we need it for
   // generating addresses when we call SimpleHttpServer::setup.
-  // Serial.print("Calling JitterRandom at ");
-  // Serial.println(millis());
-  auto seed = JitterRandom::random32();
-  // Serial.print("JitterRandom returned at ");
-  // Serial.println(millis());
-  // Serial.print("seed=");
-  // Serial.print(seed);
-  // Serial.print(" (0x");
-  // Serial.print(seed, HEX);
-  // Serial.println(")");
-
-  randomSeed(seed);
+  initializeRandomSeed();
 
   // As described on the freetronics website, there is a delay between the reset
   // of the EtherTen board and the time when the Ethernet chip is allowed to
@@ -213,6 +210,9 @@ void setup() {
   // soon. Waiting a few 100ms will not be a big deal in the life of the unit.
   // To learn more, see:
   //       https://www.freetronics.com.au/pages/usb-power-and-reset
+  // Note that with the v2 Ethernet library this may no longer be needed; it
+  // appears that the library has its own such delay. However, better safe than
+  // sorry, given that we don't want this to fail in the field.
   delay(200);
 
   // Initialize networking. Provide an "Organizationally Unique Identifier"
@@ -275,4 +275,20 @@ void announceFailure(const char* message) {
     Serial.println(message);
     delay(1000);
   }
+}
+
+void initializeRandomSeed() {
+  DBG("Calling JitterRandom at ");
+  DBGLN(millis());
+
+  auto seed = JitterRandom::random32();
+  randomSeed(seed);
+
+  DBG("JitterRandom returned at ");
+  DBGLN(millis());
+  DBG("seed=");
+  DBG(seed);
+  DBG(" (0x");
+  DBG2(seed, HEX);
+  DBGLN(")");
 }
