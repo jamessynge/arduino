@@ -21,7 +21,7 @@ void setup() {
 void loop() {
   if (num_register_reads > max_num_register_reads) {
     num_register_reads = min_num_register_reads;
-    Serial.print("# Start over at");
+    Serial.print("# Start over at ");
     Serial.println(jamessynge::ArdTime::Now());
   }
 

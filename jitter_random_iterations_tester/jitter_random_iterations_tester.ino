@@ -9,8 +9,6 @@
 #include <inttypes.h>
 
 #include "jitter_random.h"
-#include "debug.h"
-#include "test.h"
 #include "time.h"
 
 int min_num_register_reads = 1;
