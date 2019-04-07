@@ -13,8 +13,12 @@ class JitterRandom {
     // need to read at least 6 times, but more reads will be better. This
     // operation is slow (~16ms per register read on an Arduino Mega), and maybe
     // not well distributed, so a good use for this function is to generate a
-    // seed for the randomSeed() function of the Arduino core library.
-    static uint32_t random32(int num_register_reads=32);
+    // seed for the randomSeed() function of the Arduino core library. The
+    // default number of register reads was selected by recording lots of values
+    // produced by this function (see the jitter_random_iterations_tester.ino
+    // sketch), then assessing the randomness using the Chi-Squared test (see
+    // eval_jitter_random_iterations.py).
+    static uint32_t random32(int num_register_reads=15);
 };
 
 #endif  // _JITTER_RANDOM_H_

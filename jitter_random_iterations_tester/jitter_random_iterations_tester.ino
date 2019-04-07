@@ -11,8 +11,8 @@
 #include "jitter_random.h"
 #include "time.h"
 
-int min_num_register_reads = 1;
-int max_num_register_reads = 64;
+int min_num_register_reads = 6;
+int max_num_register_reads = 20;
 int num_register_reads;
 
 void setup() {
