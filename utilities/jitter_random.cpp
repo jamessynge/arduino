@@ -1,17 +1,17 @@
-// This is based on TrueRandomSeed.ino by Walter Anderson, copied from:
+// This was originally based on TrueRandomSeed.ino by Walter Anderson:
 //   https://sites.google.com/site/astudyofentropy/project-definition/timer-jitter-entropy-sources/entropy-library/arduino-random-seed
 // See also:
 //   https://sites.google.com/site/astudyofentropy/project-definition/timer-jitter-entropy-sources/entropy-library
 // Original Copyright 2014 by Walter Anderson, wandrson01 at gmail dot com
 //
-// I discovered that the hash function he specified was flawed; the naming
-// implied a rotation of bits, but in fact there wasn't a rotation, so only
-// the last four TCNT1L values (bytes) was being used.
+// I discovered that the hash function he specified was flawed: the variable
+// `nrot` implied a rotation of bits, but in fact there wasn't a rotation, so
+// only the last four TCNT1L values (bytes) were being used.
 // Furthermore, when I applied a chi-squared test to the hash he specified,
 // it was very unsatisfactory (i.e. the P-value was far below the desired
 // level). I tested several (see hash_tester.py in the jitter_random_tester
 // sketch directory), and found that the Dan J Bernstein hash #2 (DJB2) was
-// quite good, and has very low computational cost, so I've switched to using
+// reasonable, and has very low computational cost, so I've switched to using
 // that here.
 
 #include <Arduino.h>
