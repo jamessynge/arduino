@@ -10,13 +10,44 @@ using eeprom_io::Crc32;
 #include "debug.h"
 
 namespace {
-// This is the name used to identify the data stored in the EEPROM.
-// Changing the value (e.g. between "addrs" and "Addrs") has the
-// effect of invalidating the currently stored values, which can
-// be useful if you want to change the space from whicn one or both
-// the addresses is allocated.
+// This is the name used to identify the data stored in the EEPROM. Changing the
+// value (e.g. between "addrs" and "Addrs") has the effect of invalidating the
+// currently stored values, which can be useful if you want to change the
+// OuiPrefix, or to debug this code.
 const char kName[] = "addrs";
 
+
+// A link-local address is in the range 169.254.1.0 to 169.254.254.255,
+// inclusive. Learn more: https://tools.ietf.org/html/rfc3927
+void pickIPAddress(IPAddress* output) {
+  int c = random(254) + 1;
+  DBG("pickIPAddress: c=");
+  DBGLN(c);
+
+  int d = random(256);
+  DBG("pickIPAddress: d=");
+  DBGLN(d);
+
+  (*output)[0] = 169;
+  (*output)[1] = 254;
+  (*output)[2] = c;
+  (*output)[3] = d;
+}
+
+// Will modify the first byte of a MAC address so that it is in the
+// Organizationally Unique Identifier space, and that it is a unicast
+// (rather than multicast) address.
+uint8_t toOuiUnicast(uint8_t macByte1) {
+  // Make sure this is in the locally administered space.
+  macByte1 |= 2;
+  // And not a multicast address.
+  macByte1 &= ~1;
+  return macByte1;
+}
+
+}  // namespace
+
+////////////////////////////////////////////////////////////////////////////////
 // An Arduino Ethernet shield (or an freetronics EtherTen board, which I've used
 // to test this code) does not have its own MAC address (the unique identifier
 // used to distinguish one Ethernet device from another). Fortunately the design
@@ -40,67 +71,6 @@ const char kName[] = "addrs";
 //     least significant bit is 1. Therefore, it is a locally
 //     administered address. The bit is 0 in all OUIs.
 
-
-// bool pickMACAddress(byte* mac, AnalogRandom* rng) {
-//   for (int i = 0; i < 6; ++i) {
-//     int r = rng->randomByte();
-//     if (r < 0) {
-//       return false;
-//     }
-//     mac[i] = r;
-//     Serial.print("mac[");
-//     Serial.print(i);
-//     Serial.print("] = 0x");
-//     Serial.println(r, HEX);
-//   }
-//   // Make sure this is in the local administered space.
-//   mac[0] |= 2;
-//   // And not a multicast address.
-//   mac[0] &= ~1;
-//   return true;
-// }
-
-// A link-local address is in the range 169.254.1.0 to 169.254.254.255,
-// inclusive. Learn more: https://tools.ietf.org/html/rfc3927
-bool pickIPAddress(IPAddress* output) {
-  int c = random(254) + 1;
-  DBG("pickIPAddress: c=");
-  DBGLN(c);
-
-  int d = random(256);
-  DBG("pickIPAddress: d=");
-  DBGLN(d);
-
-  (*output)[0] = 169;
-  (*output)[1] = 254;
-  (*output)[2] = c;
-  (*output)[3] = d;
-  return true;
-}
-
-// Will modify the first byte of a MAC address so that it is in the
-// Organizationally Unique Identifier space, and that it is a unicast
-// (rather than multicast) address.
-uint8_t toOuiUnicast(uint8_t macByte1) {
-  // Make sure this is in the locally administered space.
-  macByte1 |= 2;
-  // And not a multicast address.
-  macByte1 &= ~1;
-  return macByte1;
-}
-
-}  // namespace
-
-// void printMACAddress(byte* mac) {
-//   Serial.print(mac[0], HEX);
-//   for (int i = 1; i < 6; ++i) {
-//     Serial.print("-");
-//     Serial.print(mac[i], HEX);
-//   }
-// }
-
-////////////////////////////////////////////////////////////////////////////////
-
 OuiPrefix::OuiPrefix() : OuiPrefix(0, 0, 0) {}
 
 OuiPrefix::OuiPrefix(uint8_t a, uint8_t b, uint8_t c) {
@@ -120,7 +90,7 @@ size_t OuiPrefix::printTo(Print& p) const {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool MacAddress::generateAddress(const OuiPrefix* oui_prefix) {
+void MacAddress::generateAddress(const OuiPrefix* oui_prefix) {
   int first_index;
   if (oui_prefix) {
     first_index = 3;
@@ -141,7 +111,6 @@ bool MacAddress::generateAddress(const OuiPrefix* oui_prefix) {
     DBG("] = 0x");
     DBGLN2(r, HEX);
   }
-  return true;
 };
 
 size_t MacAddress::printTo(Print& p) const {
@@ -219,16 +188,13 @@ int SaveableIPAddress::read(int fromAddress, Crc32* crc) {
 #define DBG_CALL_PRINTLN(prefix)
 #endif
 
-
-bool Addresses::loadOrGenAndSave(const OuiPrefix* oui_prefix) {
+void Addresses::loadOrGenAndSave(const OuiPrefix* oui_prefix) {
   DBGLN("Entered loadOrGenAndSave");
   if (load(oui_prefix)) {
-    return true;
+    return;
   }
   // Need to generate a new address.
-  if (!generateAddresses(oui_prefix)) {
-    return false;
-  }
+  generateAddresses(oui_prefix);
   save();
 
 #ifdef DO_DEBUG
@@ -237,7 +203,7 @@ bool Addresses::loadOrGenAndSave(const OuiPrefix* oui_prefix) {
   ASSERT(loader.ip == ip);
 #endif
 
-  return true;
+  return;
 }
 
 void Addresses::save() const {
@@ -275,21 +241,9 @@ bool Addresses::load(const OuiPrefix* oui_prefix) {
   return true;
 }
 
-bool Addresses::generateAddresses(const OuiPrefix* oui_prefix) {
-  DBG_CALL_PRINTLN("ga1 ");
-  if (!mac.generateAddress(oui_prefix)) {
-    // Unable to find enough randomness.
-    DBG_CALL_PRINTLN("ga1 failed ");
-    return false;
-  }
-  DBG_CALL_PRINTLN("ga2 ");
-  if (!pickIPAddress(&ip)) {
-    // Unable to find enough randomness.
-    DBG_CALL_PRINTLN("ga2 failed ");
-    return false;
-  }
-  DBG_CALL_PRINTLN("ga3 success ");
-  return true;
+void Addresses::generateAddresses(const OuiPrefix* oui_prefix) {
+  mac.generateAddress(oui_prefix);
+  pickIPAddress(&ip);
 }
 
 void Addresses::println(const char* prefix) const {

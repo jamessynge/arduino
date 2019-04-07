@@ -16,12 +16,10 @@ SimpleHttpServer::SimpleHttpServer(int chip_select_pin, int port)
 
 bool SimpleHttpServer::setup(const OuiPrefix* oui_prefix) {
   // Load the addresses saved to EEPROM, if they were previously saved. If they
-  // were not successfully loaded, then generate them.
+  // were not successfully loaded, then generate them and save them into the
+  // EEPROM.
   Addresses addresses;
-  if (!addresses.loadOrGenAndSave(oui_prefix)) {
-    // Whoops!
-    return false;
-  }
+  addresses.loadOrGenAndSave(oui_prefix);
 
   Serial.print("MAC: ");
   Serial.println(addresses.mac);
