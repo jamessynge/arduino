@@ -3,6 +3,6 @@
 
 #include <Arduino.h>
 
-void setup();
+void loop_helper();
 
 #endif  // SOME_HEADER_GUARD

@@ -3,6 +3,6 @@
 
 #include <EEPROM.h>
 
-void loop() {
-  Serial.write(EEPROM[1] + 0);
+void loop_helper() {
+  Serial.write(EEPROM[3] + 0);
 }

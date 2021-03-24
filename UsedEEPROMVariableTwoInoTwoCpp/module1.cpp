@@ -3,7 +3,6 @@
 
 #include <EEPROM.h>
 
-void setup() {
-  Serial.begin(9600);  
-  Serial.write(EEPROM[0] + 0);
+void setup_helper() {
+  Serial.write(EEPROM[2] + 0);
 }

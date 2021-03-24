@@ -3,6 +3,6 @@
 
 #include <Arduino.h>
 
-void setup();
+void setup_helper();
 
 #endif  // MODULE1_HEADER_GUARD

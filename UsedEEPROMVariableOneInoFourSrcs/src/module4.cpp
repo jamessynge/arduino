@@ -1,10 +1,11 @@
+#include "module3.h"
+
 #include <Arduino.h>
 #include <EEPROM.h>
 
-#include "module1.h"
 #include "module2.h"
 
 void loop() {
-  Serial.write('1' + 0);
+  Serial.write(EEPROM[1] + 0);
   loop_helper();
 }
