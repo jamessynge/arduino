@@ -4,7 +4,7 @@
 #include <Arduino.h>
 
 namespace {
-void AssertFailedAt(const char* file, unsigned long line) {
+inline void AssertFailedAt(const char* file, unsigned long line) {
   Serial.println();
   Serial.print("Assertion failed at ");
   Serial.print(file);
@@ -16,9 +16,6 @@ void AssertFailedAt(const char* file, unsigned long line) {
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 #define ASSERT_FAILED_AT AssertFailedAt(__FILE__, __LINE__)
-  // Serial.println(); \
-  // AssertFailedAt
-  //  Serial.println("Assertion failed at " TOSTRING(__LINE__) " in file " __FILE__)
 
 #define EXPECT_TRUE(exp) if (exp) ; else {ASSERT_FAILED_AT; Serial.println("NOT TRUE: " #exp); }
 #define EXPECT_FALSE(exp) if (!exp) ; else {ASSERT_FAILED_AT; Serial.println("NOT FALSE: " #exp); }

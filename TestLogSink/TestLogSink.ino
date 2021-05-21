@@ -35,8 +35,8 @@ Global variables use 184 bytes (2%) of dynamic memory, leaving 8008 bytes for lo
 WOOT!!! Same size as without 
 */
 
-#define DO_LOG_SINK 0
-#define DO_VOID_SINK 1
+#define DO_LOG_SINK 1
+#define DO_VOID_SINK 0
 
 
 
@@ -72,7 +72,7 @@ class VoidSink {
   public:
 
     template <typename T>
-    friend VoidSink& operator<<(VoidSink& sink, const T&) {
+    friend VoidSink operator<<(VoidSink sink, const T&) {
       return sink;
     }
 };
@@ -89,8 +89,9 @@ void setup() {
   while (!Serial) {}
 
 #ifdef MakeSink
-  auto sink = MakeSink;
-  sink << "Start";
+//  auto sink = MakeSink;
+//  sink << "Start";
+  if (true) ; else MakeSink << "Start";
 #endif
 }
 
@@ -99,7 +100,8 @@ void loop() {
   delay(1000);
   
 #ifdef MakeSink
-  auto sink = MakeSink;
-  sink << 1;
+  if (true) ; else MakeSink << 1;
+//  auto sink = MakeSink;  
+//  MakeSink << 1;
 #endif
 }

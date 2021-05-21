@@ -11,7 +11,7 @@ int max_num_register_reads = 64;
 int num_register_reads;
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(57600);
   delay(1000);
   Serial.println("# Start");
 
